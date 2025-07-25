@@ -1,4 +1,4 @@
-Flask
-line-bot-sdk
-gunicorn
-requests
+Flask==3.1.1
+gunicorn==21.2.0
+line-bot-sdk==3.17.1
+requests==2.32.4
