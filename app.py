@@ -4,168 +4,142 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import os
 import requests
-from datetime import datetime
 
 app = Flask(__name__)
 
+# 環境變數
 line_bot_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 handler = WebhookHandler(os.getenv("LINE_CHANNEL_SECRET"))
 
-APIKEY = "CWA-FA9ADF96-A21B-4D5D-9E9D-839DBF75AF71"  # 你的氣象局授權碼
+# 氣象局 API 金鑰
+CWA_API_KEY = "CWA-FA9ADF96-A21B-4D5D-9E9D-839DBF75AF71"
 
-def fetch_weather():
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={APIKEY}&locationName=雲林縣"
-        res = requests.get(url, timeout=7)
-        data = res.json()
-        loc = data["records"]["location"][0]
-        wx = loc["weatherElement"]
-        desc = []
-        for elem in wx:
-            if elem["elementName"] == "Wx":
-                desc.append(elem["time"][0]["parameter"]["parameterName"])
-            elif elem["elementName"] == "PoP":
-                desc.append(f"降雨機率 {elem['time'][0]['parameter']['parameterName']}%")
-            elif elem["elementName"] == "MinT":
-                desc.append(f"最低溫度 {elem['time'][0]['parameter']['parameterName']}°C")
-            elif elem["elementName"] == "MaxT":
-                desc.append(f"最高溫度 {elem['time'][0]['parameter']['parameterName']}°C")
-        return "36小時天氣：\n" + "\n".join(desc)
-    except:
-        return "天氣資料讀取失敗"
-
-def fetch_typhoon():
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-005?Authorization={APIKEY}"
-        res = requests.get(url, timeout=7)
-        data = res.json()
-        cyclones = data.get("records", {}).get("tropicalCyclones", {}).get("tropicalCyclone", [])
-        if not cyclones:
-            return "目前無活動颱風"
-        c = cyclones[0]  # 取第一個颱風
-        name = c.get("cwaTyphoonName") or c.get("typhoonName") or "未命名"
-        fix = c.get("analysisData", {}).get("fix", [{}])[0]
-        fixTime = fix.get("fixTime", "")
-        pressure = fix.get("pressure", "")
-        maxWindSpeed = fix.get("maxWindSpeed", "")
-        movingDirection = fix.get("movingDirection", "")
-        movingSpeed = fix.get("movingSpeed", "")
-        gust = fix.get("maxGustSpeed", "")
-        reply = (f"颱風名稱：{name}\n"
-                 f"最新分析時間：{fixTime}\n"
-                 f"氣壓：{pressure} hPa\n"
-                 f"最大風速：{maxWindSpeed} m/s\n"
-                 f"陣風：{gust} m/s\n"
-                 f"移動方向：{movingDirection}\n"
-                 f"移動速度：{movingSpeed} km/h")
-        return reply
-    except:
-        return "颱風資料讀取失敗"
-
-def format_time(tstr):
-    try:
-        d = datetime.fromisoformat(tstr)
-        ampm = "上午" if d.hour < 12 else "下午"
-        hour = d.hour % 12 or 12
-        return f"{d.year}/{d.month}/{d.day} {ampm} {hour}:{d.minute:02d}"
-    except:
-        return tstr
-
-def fetch_earthquake():
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization={APIKEY}&limit=3"
-        res = requests.get(url, timeout=7)
-        data = res.json()
-        eqs = data.get("records", {}).get("Earthquake", [])
-        if not eqs:
-            return "目前無地震資料"
-        messages = []
-        for eq in eqs:
-            info = eq.get("EarthquakeInfo", {})
-            loc = info.get("Epicenter", {}).get("Location", "未知地點")
-            mag = info.get("EarthquakeMagnitude", {}).get("MagnitudeValue", "未知")
-            depth = info.get("FocalDepth", "未知")
-            time = format_time(info.get("OriginTime", ""))
-            messages.append(f"震央：{loc}\n時間：{time}\n規模：{mag}\n深度：{depth} 公里")
-        return "顯著有感地震（最近3筆）：\n\n" + "\n\n".join(messages)
-    except:
-        return "地震資料讀取失敗"
-
-def fetch_tide():
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={APIKEY}"
-        res = requests.get(url, timeout=7)
-        data = res.json()
-        forecasts = data.get("records", {}).get("TideForecasts", [])
-        loc_data = None
-        for loc in forecasts:
-            if loc.get("Location", {}).get("LocationName") == "口湖":
-                loc_data = loc
-                break
-        if not loc_data:
-            return "找不到口湖鄉潮汐資料"
-        today = datetime.now().strftime("%Y-%m-%d")
-        tides = []
-        for day in loc_data.get("Location", {}).get("TimePeriods", {}).get("Daily", []):
-            if day.get("Date") == today:
-                for t in day.get("Time", []):
-                    type_ = t.get("Tide", "")
-                    time_ = t.get("DateTime", "")[11:16]
-                    height = t.get("TideHeights", {}).get("AboveChartDatum", "-")
-                    tides.append(f"{type_} {time_} 潮高：{height} 公分")
-        if not tides:
-            return "今日無潮汐資料"
-        return "今日潮汐預報：\n" + "\n".join(tides)
-    except:
-        return "潮汐資料讀取失敗"
-
-def get_links():
-    links = [
-        ("韌性防災", "https://yliflood.yunlin.gov.tw/cameralist/#"),
-        ("雲林路燈", "https://lamp.yunlin.gov.tw/slyunlin/Default.aspx"),
-        ("管線挖掘", "https://pwd.yunlin.gov.tw/YLPub/"),
-        ("台灣電力", "https://service.taipower.com.tw/nds/ndsWeb/ndft112.aspx"),
-        ("停電查詢", "https://service.taipower.com.tw/branch/d120/xcnotice?xsmsid=0M242581310910082112"),
-        ("自來水", "https://web.water.gov.tw/wateroff/"),
-        ("氣象署官網", "https://www.cwa.gov.tw/V8/C/")
-    ]
-    msg = "常用連結：\n"
-    for name, url in links:
-        msg += f"{name}: {url}\n"
-    return msg
-
-@app.route("/webhook", methods=["POST"])
+# ----- Webhook -----
+@app.route("/callback", methods=["POST"])
 def callback():
-    signature = request.headers.get("X-Line-Signature", "")
+    signature = request.headers["X-Line-Signature"]
     body = request.get_data(as_text=True)
+
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
         abort(400)
     return "OK"
 
+# ----- 文字處理 -----
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    text = event.message.text.strip()
+    msg = event.message.text.strip()
 
-    if "天氣" in text:
-        reply = fetch_weather()
-    elif "颱風" in text:
-        reply = fetch_typhoon()
-    elif "地震" in text:
-        reply = fetch_earthquake()
-    elif "潮汐" in text:
-        reply = fetch_tide()
-    elif "連結" in text:
-        reply = get_links()
+    if msg == "口湖天氣":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_weather()))
+    elif msg == "潮汐":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_tide()))
+    elif msg == "地震":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_quake()))
+    elif msg == "颱風":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_typhoon()))
+    elif msg == "連結":
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_links()))
     else:
-        reply = ("您好！\n請輸入以下關鍵字查詢：\n"
-                 "天氣、颱風、地震、潮汐、連結")
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入：口湖天氣、潮汐、地震、颱風 或 連結"))
 
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=reply)
+# ===== 功能實作 =====
+
+def get_weather():
+    url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={CWA_API_KEY}&locationName=雲林縣"
+    try:
+        res = requests.get(url).json()
+        loc = res["records"]["location"][0]
+        wx = loc["weatherElement"][0]["time"]
+        minT = loc["weatherElement"][2]["time"]
+        maxT = loc["weatherElement"][4]["time"]
+
+        result = "🌤️ 口湖 36 小時天氣：\n"
+        for i in range(3):
+            period = wx[i]["startTime"][5:16].replace("-", "/")
+            weather = wx[i]["parameter"]["parameterName"]
+            low = minT[i]["parameter"]["parameterName"]
+            high = maxT[i]["parameter"]["parameterName"]
+            result += f"\n🕒 {period}\n☁️ 天氣：{weather}\n🌡️ 溫度：{low}°C ~ {high}°C\n"
+
+        return result
+    except Exception as e:
+        return f"❌ 天氣資料讀取失敗：{e}"
+
+def get_tide():
+    url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={CWA_API_KEY}"
+    try:
+        res = requests.get(url).json()
+        forecasts = res["records"]["TideForecasts"]
+        target = next((f for f in forecasts if f["Location"]["LocationId"] == "10009190"), None)
+        if not target:
+            return "❌ 找不到口湖鄉潮汐資料"
+        today = target["Location"]["TimePeriods"]["Daily"][0]
+        lines = ["🌊 今日潮汐："]
+        for t in today["Time"]:
+            type_name = "退潮" if t["Tide"] == "乾潮" else t["Tide"]
+            height = t["TideHeights"]["AboveChartDatum"]
+            time = t["DateTime"][-8:-3]
+            lines.append(f"{type_name}：{time}，{height} cm")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ 潮汐資料錯誤：{e}"
+
+def get_quake():
+    try:
+        main_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization={CWA_API_KEY}&limit=1"
+        local_url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0016-001?Authorization={CWA_API_KEY}&limit=1"
+        res1 = requests.get(main_url).json()
+        res2 = requests.get(local_url).json()
+
+        info = "📡 地震速報\n"
+
+        for r in [res1, res2]:
+            quake = r["records"].get("Earthquake", [])
+            if not quake:
+                continue
+            q = quake[0]["EarthquakeInfo"]
+            loc = q.get("Epicenter", {}).get("Location", "未知")
+            time = q.get("OriginTime", "")[5:16]
+            mag = q.get("EarthquakeMagnitude", {}).get("MagnitudeValue", "?")
+            depth = q.get("FocalDepth", "?")
+            info += f"\n📍 地點：{loc}\n🕒 時間：{time}\n📏 規模：{mag}，深度：{depth} 公里\n"
+
+        return info or "✅ 無地震速報"
+    except Exception as e:
+        return f"❌ 地震資料錯誤：{e}"
+
+def get_typhoon():
+    try:
+        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-005?Authorization={CWA_API_KEY}"
+        res = requests.get(url).json()
+        cyclones = res["records"].get("tropicalCyclones", {}).get("tropicalCyclone", [])
+        if not cyclones:
+            return "✅ 目前無活動颱風"
+
+        t = cyclones[0]
+        name = t.get("cwaTyphoonName", "未命名")
+        fix = t["analysisData"]["fix"][0]
+        txt = f"🌀 颱風：{name}\n🕒 時間：{fix['fixTime']}\n📍 座標：{fix['coordinate']}\n💨 最大風速：{fix['maxWindSpeed']} m/s\n"
+        txt += f"🎯 方向：{fix['movingDirection']}，{fix['movingSpeed']} km/h\n🎈 氣壓：{fix['pressure']} hPa"
+
+        return txt
+    except Exception as e:
+        return f"❌ 颱風資料錯誤：{e}"
+
+def get_links():
+    return (
+        "🔗 常用連結：\n"
+        "📷 [韌性防災](https://yliflood.yunlin.gov.tw/cameralist/#)\n"
+        "💡 [雲林路燈](https://lamp.yunlin.gov.tw/slyunlin/Default.aspx)\n"
+        "🚧 [管線挖掘](https://pwd.yunlin.gov.tw/YLPub/)\n"
+        "⚡ [台灣電力](https://service.taipower.com.tw/nds/ndsWeb/ndft112.aspx)\n"
+        "🔌 [停電查詢](https://service.taipower.com.tw/branch/d120/xcnotice?xsmsid=0M242581310910082112)\n"
+        "🚰 [自來水](https://web.water.gov.tw/wateroff/)\n"
+        "🌐 [氣象署官網](https://www.cwa.gov.tw/V8/C/)"
     )
 
+# ----- 主程式入口 -----
 if __name__ == "__main__":
-    app.run(port=10000)
+    app.run()
