@@ -221,20 +221,16 @@ def get_tide_kouhu():
         # 取得今天日期字串 (YYYY-MM-DD)
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        # 過濾今天和明天的資料，以防今天沒有潮汐資料但明天有
-        filtered_data = [d for d in all_daily_data if d["Date"] >= today_str]
+        # 僅過濾今天的資料
+        filtered_data = [d for d in all_daily_data if d["Date"] == today_str] # <--- 這裡已修改
         
         if not filtered_data:
             return "近期口湖鄉無潮汐資料。"
 
         tide_info_parts = []
-        for day_data in filtered_data:
+        for day_data in filtered_data: # 現在這裡只會有今天的資料
             current_date_obj = datetime.strptime(day_data["Date"], "%Y-%m-%d")
-            # 判斷是今天還是明天
-            if day_data["Date"] == today_str:
-                tide_info_parts.append(f"🌊 口湖鄉今日 ({current_date_obj.strftime('%m/%d')}) 潮汐預報：")
-            else: # 如果有後續日期，也顯示
-                 tide_info_parts.append(f"\n🌊 口湖鄉明日 ({current_date_obj.strftime('%m/%d')}) 潮汐預報：")
+            tide_info_parts.append(f"🌊 口湖鄉今日 ({current_date_obj.strftime('%m/%d')}) 潮汐預報：")
 
             if not day_data.get("Time"):
                 tide_info_parts.append("　本日無潮汐事件。\n")
