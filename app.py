@@ -3,6 +3,7 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import requests
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -81,7 +82,13 @@ def handle_message(event):
 def get_weather():
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={CWA_API_KEY}&locationName=雲林縣"
-        r = requests.get(url).json()
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # 檢查 HTTP 狀態碼
+        r = response.json()
+
+        if "records" not in r or not r["records"].get("location"):
+            return "❌ 無法取得天氣預報，可能是資料來源問題"
+        
         loc = r["records"]["location"][0]
         weather_elements = {e['elementName']: e['time'] for e in loc['weatherElement']}
 
@@ -94,7 +101,7 @@ def get_weather():
 
         labels = ['今早', '今晚', '明早']
         results = []
-        for i in range(3):
+        for i in range(3):  # 取得未來 3 個時段資料
             wx = weather_elements['Wx'][i]['parameter']['parameterName']
             pop = weather_elements['PoP'][i]['parameter']['parameterName']
             min_t = weather_elements['MinT'][i]['parameter']['parameterName']
@@ -113,17 +120,23 @@ def get_weather():
 def get_tide():
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={CWA_API_KEY}"
-        r = requests.get(url).json()
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        r = response.json()
+
+        if "records" not in r or not r["records"].get("TideForecasts"):
+            return "❌ 無法取得潮汐資料，可能是資料來源問題"
+
         location_id = "10009190"  # 口湖鄉
         forecasts = r["records"]["TideForecasts"]
         loc_data = next((loc for loc in forecasts if loc["Location"]["LocationId"] == location_id), None)
-        if not loc_data:
-            return "找不到口湖鄉潮汐資料"
 
-        # 取今日資料
-        from datetime import datetime
+        if not loc_data:
+            return "❌ 找不到口湖鄉的潮汐資料"
+
         today_str = datetime.now().strftime("%Y-%m-%d")
         daily = [d for d in loc_data["Location"]["TimePeriods"]["Daily"] if d["Date"] == today_str]
+
         if not daily:
             return "今日無潮汐資料"
 
