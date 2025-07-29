@@ -362,7 +362,7 @@ def get_links():
         ("台灣電力", "https://service.taipower.com.tw/nds/ndsWeb/ndft112.aspx"),
         ("停電查詢", "https://service.taipower.com.tw/branch/d120/xcnotice?xsmsid=0M242581310910082112"),
         ("自來水公司", "https://wateroff.water.gov.tw/"),
-        ("清潔隊資訊", "https://epb.yunlin.gov.tw/files/11-1000-165.php")
+        ("氣象署資訊", "https://www.cwa.gov.tw/V8/C/")
     ]
 
 if __name__ == "__main__":
