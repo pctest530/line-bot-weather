@@ -91,6 +91,7 @@ def get_weather_kouhu():
     """獲取口湖鄉 36 小時天氣預報"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={CWA_API_KEY}&locationName=雲林縣"
+        # 修正：加入 verify=False
         r = requests.get(url, verify=False).json()
         
         loc = r["records"]["location"][0]
@@ -148,6 +149,7 @@ def get_tide_kouhu():
     LOCATION_ID = "10009190" # 口湖鄉
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={CWA_API_KEY}"
+        # 修正：加入 verify=False
         r = requests.get(url, verify=False).json()
 
         if r.get("success") not in ["true", True]:
@@ -253,7 +255,7 @@ def get_links():
         ("台灣電力", "https://service.taipower.com.tw/nds/ndsWeb/ndft112.aspx"),
         ("停電查詢", "https://service.taipower.com.tw/branch/d120/xcnotice?xsmsid=0M242581310910082112"),
         ("自來水公司", "https://wateroff.water.gov.tw/"),
-        ("氣象署", "https://www.cwa.gov.tw/V8/C/")
+        ("清潔隊資訊", "https://epb.yunlin.gov.tw/files/11-1000-165.php")
     ]
 
 if __name__ == "__main__":
