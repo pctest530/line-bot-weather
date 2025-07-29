@@ -3,20 +3,19 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import requests
-from datetime import datetime, timedelta # 確保只導入一次且包含 timedelta
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# ✅ 你的 LINE 憑證資訊
-# 請務必將這些值替換為您自己 LINE Bot 的實際憑證！
-LINE_CHANNEL_ACCESS_TOKEN = "voGLDMSHC/Xfng1zq62Tn4pGDC2ZWwb7l+HrUj54NNXy1SfAy3Bs/EKp64WLlwQaSQeomnS1JmIWCqugoovc9IxNQfp8vA1PNdxUpYanXVh/vEGAKb4yrufufYMhp+kGsT4fUx+I+HwNIzHTqqtbgdB04t89/1O/w1cDnyilFU="
+# ✅ 你的 LINE 憑證資訊 - 已更新為您提供的最新憑證
+LINE_CHANNEL_ACCESS_TOKEN = "voGLDMSHC/Xfng1zq62Tn4pGDC2ZWwb7l+HrUj54NNqXy1SfAy3Bs/EKp64WLlwQaSQeomnS1JmIWCqugoovc9IxNQfp8vA1PNdxUpYanXVh/vEGAKb4yrufufYMhp+kGsT4fUx+I+HwNIzHTqqtbgdB04t89/1O/w1cDnyilFU="
 LINE_CHANNEL_SECRET = "6362b12e044b913859b3772bf42cfa0d"
 TO_USER_ID = "Uaaec86d0060844844df5bb2e731a375f" # 可選，用於啟動時推播訊息，若不需要可將此行註解或設為 None
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# ✅ 氣象局金鑰
+# ✅ 氣象局金鑰 - 已更新為您提供的最新金鑰
 CWA_API_KEY = "CWA-FA9ADF96-A21B-4D5D-9E9D-839DBF75AF71"
 
 # 天氣圖示對應 (只定義一次)
