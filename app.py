@@ -2,24 +2,29 @@ from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-import os
 import requests
 
 app = Flask(__name__)
 
-# 環境變數或直接寫入 token 和 secret
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
-CWA_API_KEY = "CWA-FA9ADF96-A21B-4D5D-9E9D-839DBF75AF71"
+# ✅ 你的 LINE Token 和 Secret（請部署完後更新密鑰以防安全問題）
+LINE_CHANNEL_ACCESS_TOKEN = "voGLDMSHC/Xfng1zq62Tn4pGDC2ZWwb7l+HrUj54NNqXy1SfAy3Bs/EKp64WLlwQaSQeomnS1JmIWCqugoovc9IxNQfp8vA1PNdxUpYanXVh/vEGAKb4yrufufYMhp+kGsT4fUx+I+HwNIzHTqqtbgdB04t89/1O/w1cDnyilFU="
+LINE_CHANNEL_SECRET = "6362b12e044b913859b3772bf42cfa0d"
+
+# ✅ 替換成你自己的 User ID，暫時寫空白方便測試
+TO_USER_ID = "填入你的 LINE User ID"
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 @app.route("/")
 def home():
-    return "LINE Bot Webhook 已上線"
+    try:
+        line_bot_api.push_message(TO_USER_ID, TextSendMessage(text="✅ 測試成功：首頁已自動發送訊息"))
+        return "LINE Bot Webhook 已上線，已發送測試訊息"
+    except Exception as e:
+        return f"❌ 發送失敗：{str(e)}"
 
-@app.route("/webhook", methods=['POST'])  # ✅ 改成 /webhook
+@app.route("/webhook", methods=['POST'])
 def webhook():
     signature = request.headers['X-Line-Signature']
     body = request.get_data(as_text=True)
@@ -46,6 +51,9 @@ def handle_message(event):
         res = "請輸入關鍵字：天氣、潮汐、颱風 或 地震"
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
+
+# ---------- CWA 氣象 API Key ----------
+CWA_API_KEY = "CWA-FA9ADF96-A21B-4D5D-9E9D-839DBF75AF71"
 
 # ---------- 天氣 ----------
 def get_weather():
