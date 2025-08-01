@@ -359,6 +359,7 @@ def get_links():
         ("停電查詢", "https://service.taipower.com.tw/branch/d120/xcnotice?xsmsid=0M242581310910082112"),
         ("自來水公司", "https://wateroff.water.gov.tw/"),
         ("氣象署資訊", "https://www.cwa.gov.tw/V8/C/")
+        ("停班課查詢", "https://www.dgpa.gov.tw/typh/daily/nds.html"),
     ]
 
 if __name__ == "__main__":
