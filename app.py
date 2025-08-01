@@ -1,14 +1,18 @@
 import os
 from flask import Flask, request, abort, render_template_string
 from linebot import LineBotApi, WebhookHandler
-from linebot.exceptions import InvalidSignatureError
+from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 import requests
 from datetime import datetime, timedelta
 import logging
+import urllib3
 
 # 設置日誌，方便除錯
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# 禁用 SSL 警告，以解決部署環境的憑證驗證問題
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 
@@ -60,8 +64,12 @@ def home():
                 TO_USER_ID,
                 TextSendMessage(text="✅ LINE BOT 已啟動，請輸入：幫助")
             )
+        except LineBotApiError as e:
+            # 捕獲 LINE API 的特定錯誤，避免程式中斷
+            logging.error(f"❌ 推播失敗：{e}")
         except Exception as e:
-            logging.error(f"❌ 推播失敗：{str(e)}")
+            # 捕獲其他未知錯誤
+            logging.error(f"❌ 推播發生未知錯誤：{e}")
             
     html = """
     <h2>✅ LINE BOT 已啟動</h2>
@@ -117,54 +125,12 @@ def handle_message(event):
     
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
 
-# --- API 取得資料函數區 (未修改部分已省略) ---
-# ... (這裡省略了 get_weather_kouhu, get_tide_kouhu, get_typhoon, get_links_message 等函數) ...
-
-# ✅ 修正後的地震資料函數
-def get_earthquake():
-    """獲取最新 3 筆有感地震資料"""
-    try:
-        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization={CWA_API_KEY}"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
-        earthquakes = data.get("records", {}).get("Earthquake", [])
-        if not earthquakes:
-            return "📡 目前無顯著有感地震資料。"
-
-        # 只取最新的 3 筆資料
-        recent_earthquakes = earthquakes[:3]
-        
-        earthquake_list = ["📡 最新有感地震："]
-        for eq in recent_earthquakes:
-            eq_info = eq.get("EarthquakeInfo")
-            if not eq_info:
-                continue
-
-            origin_time = datetime.fromisoformat(eq_info.get('OriginTime', '')).strftime("%Y/%m/%d %H:%M")
-            epicenter_loc = eq_info.get('Epicenter', {}).get('Location', '未知地點')
-            magnitude = eq_info.get('EarthquakeMagnitude', {}).get('MagnitudeValue', '未知')
-            focal_depth = eq_info.get('FocalDepth', '未知')
-
-            earthquake_list.append(
-                f"\n📍 地點：{epicenter_loc}\n"
-                f"🕒 時間：{origin_time}\n"
-                f"📏 規模：{magnitude}，深度：{focal_depth} 公里"
-            )
-        
-        return "\n".join(earthquake_list)
-
-    except (requests.RequestException, ValueError, Exception) as e:
-        logging.error(f"Error fetching earthquake data: {e}")
-        return "❌ 取得地震資料失敗，請稍後再試。"
-
-# ... (這裡省略了 get_weather_kouhu, get_tide_kouhu, get_typhoon, get_links_message 等函數) ...
+# --- API 取得資料函數區 ---
 def get_weather_kouhu():
     """獲取口湖鄉 36 小時天氣預報"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={CWA_API_KEY}&locationName=雲林縣"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
         response.raise_for_status()
         data = response.json()
         
@@ -220,7 +186,7 @@ def get_tide_kouhu():
     """獲取口湖鄉潮汐預報（今日）"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={CWA_API_KEY}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
         response.raise_for_status()
         data = response.json()
 
@@ -258,7 +224,7 @@ def get_typhoon():
     """獲取最新颱風資料"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-005?Authorization={CWA_API_KEY}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
         response.raise_for_status()
         data = response.json()
         
@@ -288,6 +254,44 @@ def get_typhoon():
     except (requests.RequestException, ValueError, Exception) as e:
         logging.error(f"Error fetching typhoon data: {e}")
         return "❌ 取得颱風資料失敗，請稍後再試。"
+
+
+def get_earthquake():
+    """獲取最新 3 筆有感地震資料"""
+    try:
+        url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization={CWA_API_KEY}"
+        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
+        response.raise_for_status()
+        data = response.json()
+        
+        earthquakes = data.get("records", {}).get("Earthquake", [])
+        if not earthquakes:
+            return "📡 目前無顯著有感地震資料。"
+
+        recent_earthquakes = earthquakes[:3]
+        
+        earthquake_list = ["📡 最新有感地震："]
+        for eq in recent_earthquakes:
+            eq_info = eq.get("EarthquakeInfo")
+            if not eq_info:
+                continue
+
+            origin_time = datetime.fromisoformat(eq_info.get('OriginTime', '')).strftime("%Y/%m/%d %H:%M")
+            epicenter_loc = eq_info.get('Epicenter', {}).get('Location', '未知地點')
+            magnitude = eq_info.get('EarthquakeMagnitude', {}).get('MagnitudeValue', '未知')
+            focal_depth = eq_info.get('FocalDepth', '未知')
+
+            earthquake_list.append(
+                f"\n📍 地點：{epicenter_loc}\n"
+                f"🕒 時間：{origin_time}\n"
+                f"📏 規模：{magnitude}，深度：{focal_depth} 公里"
+            )
+        
+        return "\n".join(earthquake_list)
+
+    except (requests.RequestException, ValueError, Exception) as e:
+        logging.error(f"Error fetching earthquake data: {e}")
+        return "❌ 取得地震資料失敗，請稍後再試。"
 
 def get_links_message():
     """產生常用連結的文字訊息"""
