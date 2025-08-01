@@ -101,7 +101,7 @@ def webhook():
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    """根據使用者輸入的文字訊息進行回覆"""
+    """根據使用者輸入的文字訊息進行回覆，只回覆已知指令"""
     msg = event.message.text.strip().lower() # 將輸入轉為小寫，方便比對
     user_id = event.source.user_id
 
@@ -117,20 +117,20 @@ def handle_message(event):
         "幫助": lambda: "可用指令：\n天氣, 潮汐, 颱風, 地震, 連結"
     }
     
-    # 這裡修改了預設回覆的邏輯
-    res = commands.get(msg, lambda: "請輸入 **幫助** 來查看可用指令。")()
-    
-    if len(res) > 2000:
-        res = res[:1990] + "..."
-    
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
+    # 檢查輸入是否為已知指令
+    if msg in commands:
+        res = commands.get(msg)()
+        if len(res) > 2000:
+            res = res[:1990] + "..."
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=res))
+    # 如果輸入不是已知指令，則不回覆任何訊息
 
 # --- API 取得資料函數區 ---
 def get_weather_kouhu():
     """獲取口湖鄉 36 小時天氣預報"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization={CWA_API_KEY}&locationName=雲林縣"
-        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
+        response = requests.get(url, verify=False, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -186,7 +186,7 @@ def get_tide_kouhu():
     """獲取口湖鄉潮汐預報（今日）"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-A0021-001?Authorization={CWA_API_KEY}"
-        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
+        response = requests.get(url, verify=False, timeout=10)
         response.raise_for_status()
         data = response.json()
 
@@ -224,7 +224,7 @@ def get_typhoon():
     """獲取最新颱風資料"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/W-C0034-005?Authorization={CWA_API_KEY}"
-        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
+        response = requests.get(url, verify=False, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -260,7 +260,7 @@ def get_earthquake():
     """獲取最新 3 筆有感地震資料"""
     try:
         url = f"https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization={CWA_API_KEY}"
-        response = requests.get(url, verify=False, timeout=10) # <-- 確保有 verify=False
+        response = requests.get(url, verify=False, timeout=10)
         response.raise_for_status()
         data = response.json()
         
